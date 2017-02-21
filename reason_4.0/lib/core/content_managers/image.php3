@@ -93,6 +93,7 @@
 			'acceptable_types' => $acceptable_types) );
 			
 			$image = $this->get_element('image');
+			
 			$image->get_head_items($this->head_items);
 			$this->add_element('default_thumbnail', 'checkbox', 
 					array('description' => 'Generate thumbnail from full-size image'));
