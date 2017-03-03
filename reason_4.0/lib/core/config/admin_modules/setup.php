@@ -87,6 +87,7 @@
 		'ReviewChanges'=>array('file'=>'review_changes.php','class'=>'ReasonReviewChangesModule'),
 		'SitePages'=>array('file'=>'site_pages.php','class'=>'ReasonSitePagesModule'),
 		'ImageSizer'=>array('file'=>'image_sizer.php','class'=>'ImageSizerModule'),
+        'ImageRotater'=>array('file'=>'image_rotater.php','class'=>'ImageRotaterModule'),
 		'OrphanManager'=>array('file'=>'orphan_manager.php','class'=>'OrphanManagerModule'),		
 		'ManageLocks'=>array('file'=>'manage_locks.php','class'=>'ManageLocksModule'),
 		'AdminTools'=>array('file'=>'admin_tools.php','class'=>'ReasonAdminToolsModule'),

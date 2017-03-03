@@ -47,6 +47,7 @@
 					$this->show_item_default( 'Hi-Res Image' , '<a href="'.WEB_PHOTOSTOCK.$original_name.'">View original image </a>' );
 				}
 				$this->show_item_default( 'Custom sizes' , '<a href="'.carl_make_link(array('cur_module'=>'ImageSizer')).'">Get this image at a custom size</a>' );
+				$this->show_item_default( 'Rotate' , '<a href="'.carl_make_link(array('cur_module'=>'ImageRotater')).'">Rotate this image</a>' );
 			}
 		} // }}}
 		function show_item_name( $field , $value ) // {{{
