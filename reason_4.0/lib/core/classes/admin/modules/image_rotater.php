@@ -8,7 +8,9 @@
   * Include the default module and other needed utilities
   */
 	reason_include_once('classes/admin/modules/default.php');
-	reason_include_once( 'classes/sized_image.php' );
+    include_once(CARL_UTIL_INC . 'basic/image_funcs.php');
+    reason_include_once('function_libraries/image_tools.php');
+    reason_include_once('function_libraries/admin_actions.php');
 	include_once( DISCO_INC.'disco.php' );
 	
 	/**
@@ -83,7 +85,7 @@
 			$this->_form = new Disco();
 			$this->_form->set_box_class('StackedBox');
 			
-			$this->_form->add_element('rotate_amount','radio_no_sort',array('options' => array('90'=>'Rotate 90 degrees clockwise', '180'=>'Rotate 180 degrees', '270'=>'Rotate 270 degrees')));
+			$this->_form->add_element('rotate_amount','radio_no_sort',array('options' => array('0'=> 'Do not rotate','90'=>'Rotate 90 degrees clockwise', '180'=>'Rotate 180 degrees', '270'=>'Rotate 270 degrees'), 'default' => '0', 'userland_changeable' => true));
 			
 			$this->_form->set_actions(array('generate'=>'Rotate Image'));
 			
@@ -95,7 +97,7 @@
 		}
 		
 		/**
-		 * Get the image this module will be sizing
+		 * Get the image this module will be rotating
 		 *
 		 * Returns either a Reason image object or false if permissions, types, etc. not correct
 		 *
@@ -178,64 +180,63 @@
 		 */
 		function pre_show_disco(&$disco)
 		{
+            $ret = '';
 			if($disco->has_errors())
 			{
-				return '';
-			}
-			if($image = $this->_get_image())
-			{
-				$unsized_width = $image->get_value('width');
-				$unsized_height = $image->get_value('height');
-				
-				$sized_width = $disco->get_value('width');
-				$sized_height = $disco->get_value('height');
-				
-				
-				
-				if(
-					( empty($sized_width) && empty($sized_height) )
-					||
-					( $unsized_width == $sized_width && $unsized_height == $sized_height )
-				)
-				{
-					$showing_normal_size = true;
-					$url = reason_get_image_url($image);
-				}
-				else
-				{
-					$showing_normal_size = false;
-					
-					$rsi = new reasonSizedImage();
-					$server_path = REASON_SIZED_IMAGE_CUSTOM_DIR;
-					$web_path = REASON_SIZED_IMAGE_CUSTOM_DIR_WEB_PATH;
-					$rsi->set_paths($server_path, $web_path);
-					$rsi->set_id($image->id());
-					if(!empty($sized_width))
-						$rsi->set_width($sized_width);
-					if(!empty($sized_height))
-						$rsi->set_height($sized_height);
-					if($disco->get_value('crop'))
-						$rsi->set_crop_style($disco->get_value('crop'));
-					$url = $rsi->get_url();
-				}
-				
-				$ret = '<div class="preview">'."\n";
-				$ret .= '<div class="image"><img src="'.htmlspecialchars($url).'" alt="Image sized to '.($sized_width ? $sized_width : 'auto').' by '.($sized_height ? $sized_height : 'auto').' pixels" /></div>'."\n";
-				if($showing_normal_size)
-				{
-					$ret .= '<div class="normalSizeNotice smallText">(This is the standard size of this image.)</div>'."\n";
-				}
-				else
-				{
-					$ret .= '<div class="url"><div class="label"><p>To use this image at this size:</p><ol><li>copy this web address</li><li>paste it into the "image at web address" tab in the "insert image" dialog box.</li></ol></div><input type="text" value="'.htmlspecialchars($url).'" size="50" /></div>'."\n";
-				}
-				$ret .= '</div>'."\n";
-				
-				if(!$showing_normal_size)
-					$ret .= '<h4 class="tryAgainHeading">Try another size</h4>'."\n";
-				
 				return $ret;
 			}
+            
+			if($image = $this->_get_image()) 
+            {
+                $degrees = $disco->get_value('rotate_amount');
+                if ($degrees != 0) {
+                    $path = reason_get_image_path($image);
+                    $orig_path = reason_get_image_path($image, 'orig');
+                    $tn_path = reason_get_image_path($image, 'tn');
+
+                    rotate_image($path, $degrees);
+                    rotate_image($orig_path, $degrees);
+                    rotate_image($tn_path, $degrees);
+
+                    
+                    // Find new height and width
+                    $width = $image->get_value('width');
+                    $height = $image->get_value('height');
+                    if ($degrees == '90' || $degrees == '270') {
+                        swap($width, $height);
+                    }
+                    
+                    // Find new focal point
+                    $fp_x = $image->get_value('focal_point_x');
+                    $fp_y = $image->get_value('focal_point_y');
+                    if ($degrees == '90') {
+                        swap($fp_x, $fp_y);
+                        $fp_x = 1 - $fp_x;
+                    } else if ($degrees == '180') {
+                        $fp_x = 1 - $fp_x;
+                        $fp_y = 1 - $fp_y;
+                    } else if ($degrees == '270') {
+                        swap($fp_x, $fp_y);
+                        $fp_y = 1 - $fp_y;
+                    }
+                    
+                    
+                    $updates = Array('width' => $width, 'height' => $height, 'focal_point_x' => $fp_x, 'focal_point_y' => $fp_y);
+                    reason_update_entity($this->admin_page->id, $this->admin_page->user_id, $updates);
+                }
+                $url = reason_get_image_url($image);
+			} 
+            else 
+            {
+                return $ret;
+            }
+            
+            $ret .= '<div class="preview">'."\n";
+            $ret .= '<div class="image"><img src="'.htmlspecialchars($url).'"/></div>'."\n";
+            $ret .= '</div>'."\n";
+            $ret .= var_dump($image);
+            
+            return $ret;
 		}
 		
 		/**
@@ -246,7 +247,7 @@
 		{
 			if(!empty($this->_form))
 			{
-				echo '<div id="imageSizerModule">'."\n";
+				echo '<div id="imageRotaterModule">'."\n";
 				$this->_form->run();
 				echo '</div>'."\n";
 			}
@@ -255,4 +256,11 @@
 		}
 		
 	} // }}}
+    
+    function swap(&$x, &$y) {
+        $tmp = $x;
+        $x = $y;
+        $y = $tmp;
+    }
+
 ?>

@@ -55,6 +55,45 @@ function resize_image($path, $width, $height, $sharpen=true)
 }
 
 /**
+ * Rotate an image clockwise.
+ * 
+ * The image will be rotated in place; to avoid this, make a {@link copy} of
+ * the original image first, and rotate the copy. 
+ * 
+ * If the rotate amount is not a multiple of 90, a white background will be added to the corners.
+ * The trim option can be used to remove this white abkground after succesive rotate operations.
+ * Use trim with caution!
+ *
+ * Raises a {@link WARNING} if ImageMagick is unavailable.
+ * 
+ * @param string $path filesystem path to the image to be resized
+ * @param int $degrees number of degrees to rotate image clockwise
+ * @param boolean $trim if true, the border of the roated image will be trimmed of all extra background
+ * @return boolean true if the image was rotated successfully; false if not
+ */
+function rotate_image($path, $degrees, $trim=false)
+{
+    if (!is_file($path) || !is_readable($path)) {
+        trigger_error('cannot rotate image; no file exists at the given path '.
+            '('.var_export($path, true).')', WARNING);
+        return false;
+    }
+    $perms = substr(sprintf('%o', fileperms($path)), -4);
+    if (imagemagick_available()) {
+        $result = _imagemagick_rotate($path, $degrees, $trim);
+    } else {
+        trigger_error('ImageMagick is not available; cannot rotate image', WARNING);
+        return false;
+    }
+
+    // Prevent the transformation from changing the file permissions.
+    clearstatcache();
+    $newperms = substr(sprintf('%o', fileperms($path)), -4);
+    if ($perms != $newperms) @chmod($path, octdec($perms));
+    return $result;
+}
+
+/**
  * Convert some file to an image - places the file in the same place. 
  * Right now just png is supported - other formats could be.
  * 
@@ -1017,6 +1056,36 @@ function _imagemagick_resize($path, $width, $height, $sharpen)
 	);
 	if ($sharpen)
 	    $args = array_merge($args, array('-sharpen', '1'));
+	$args[] = escapeshellarg($path);
+	
+	$output = array();
+	$exit_status = -1;
+	exec(implode(' ', $args), $output, $exit_status);
+	if ($exit_status != 0) {
+		trigger_error('image resize failed: '.implode('; ', $output), WARNING);
+		error_log(implode(' ', $args));
+		return false;
+	}
+	
+	return true;
+}
+
+/**
+ * @access private
+ */
+function _imagemagick_rotate($path, $degrees, $trim)
+{
+    if (defined('IMAGEMAGICK_PATH')) {
+		$exec = (substr(IMAGEMAGICK_PATH, -1) == DIRECTORY_SEPARATOR)
+			? IMAGEMAGICK_PATH.'mogrify'
+			: IMAGEMAGICK_PATH.DIRECTORY_SEPARATOR."mogrify";
+	} else {
+		$exec = "mogrify";
+	}
+	
+	$args = array($exec, '-rotate', $degrees);
+	if ($trim)
+	    $args[] = '-trim';
 	$args[] = escapeshellarg($path);
 	
 	$output = array();
